@@ -4,18 +4,17 @@ import os
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, parent_dir)
 
-
 import re
 import pygmt
 import numpy as np
+from mintpy.utils import readfile
 from matplotlib import pyplot as plt
 from matplotlib.colors import LightSource
-from plotdata.helper_functions import parse_polygon
-from plotdata.objects.file_handler import FileHandler
+from plotdata.helper_functions import parse_polygon, get_bounding_box
 
 
-class MapRelief():
-    def __init__(self, region=None, polygon=None, location_types: dict = {},ax=None, file: FileHandler = None):
+class Mapper():
+    def __init__(self, region=None, polygon=None, location_types: dict = {},ax=None, file=None):
         if not ax:
             self.fig = plt.figure(figsize=(8, 8))
             self.ax = self.fig.add_subplot(111)
@@ -24,13 +23,10 @@ class MapRelief():
             self.ax = ax
             self.fig = ax.get_figure()
 
-        # self.ax.set_title('Elevation Map')
-        # self.ax.set_xlabel('Longitude')
-        # self.ax.set_ylabel('Latitude')
-
         if file:
-            self.data = file.data
-            self.region = file.region
+            self.data, self.metadata = readfile.read(file)
+            latitude, longitude = get_bounding_box(self.metadata)
+            self.region = [longitude[0], longitude[1], latitude[0], latitude[1]]
 
         elif region:
                 self.region = region
@@ -49,53 +45,9 @@ class MapRelief():
         return z
 
 
-    def add_isolines(self, resolution = '01m', color = 'black', linewidth = 0.5, levels = 10, inline = False, zorder = None):
-        if not zorder:
-            zorder = self.get_next_zorder()
-
-        # Plot isolines
-        print("Adding isolines\n")
-        lines = pygmt.datasets.load_earth_relief(resolution=resolution, region=self.region)
-
-        grid_np = lines.values
-
-        # Remove negative values
-        grid_np[grid_np < 0] = 0
-
-        # Convert the numpy array back to a DataArray
-        lines[:] = grid_np
-
-        # Plot the data
-        cont = self.ax.contour(lines, levels=levels, colors=color, extent=self.region, linewidths=linewidth, zorder=zorder)
-
-        if inline:
-            self.ax.clabel(cont, inline=inline, fontsize=8)
-
-
-    def add_colormap(self, cmap = 'terrain', resolution = '01m', interpolate=False, shade=True, zorder=None):
-        if not zorder:
-            zorder = self.get_next_zorder()
-
-        # Plot colormap
-        # Load the relief data
-        print("Adding colormap\n")
-        self.elevation = pygmt.datasets.load_earth_relief(resolution=resolution, region=self.region)
-
-        if interpolate:
-            self.interpolate_relief(resolution)
-
-        # Set all negative values to 0
-        self.elevation = self.elevation.where(self.elevation >= 0, 0)
-
-        if shade:
-            im = self.shade_elevation(zorder=zorder)
-        else:
-            im = self.ax.imshow(self.elevation, cmap=cmap, extent=self.region, origin='lower',zorder=zorder)
-
-        if False:
-            # Add a colorbar
-            cbar = self.fig.colorbar(im, ax=self.ax, orientation='vertical', fraction=0.046, pad=0.04)
-            cbar.set_label('Elevation (m)')
+    def plot(self):
+        self.add_legend()
+        plt.show()
 
 
     def add_location(self, latitude, longitude, label='', type='earthquake', size=10, zorder=None):
@@ -144,7 +96,7 @@ class MapRelief():
         # TODO add displacement
         # self.data = self.data * 120/365 
         if style == 'pixel':
-            self.imdata = self.ax.imshow(self.data, cmap='jet', extent=self.region, origin='lower', interpolation='none',zorder=zorder, vmin=vmin, vmax=vmax)
+            self.imdata = self.ax.imshow(self.data, cmap='jet', extent=self.region, origin='upper', interpolation='none',zorder=zorder, vmin=vmin, vmax=vmax)
 
         elif style == 'scatter':
             # Assuming self.data is a 2D numpy array
@@ -154,38 +106,93 @@ class MapRelief():
             y = np.linspace(self.region[2], self.region[3], nrows)
             X, Y = np.meshgrid(x, y)
             X = X.flatten()
-            Y = Y.flatten()
+            Y = np.flip(Y.flatten())
             C = data.flatten()
 
             self.imdata = self.ax.scatter(X, Y, c=C, cmap='jet', marker='o', zorder=zorder, s=2, vmin=vmin, vmax=vmax)
 
 
-    def interpolate_relief(self, resolution):
-            print("!WARNING: Interpolating the data to a higher resolution grid")
-            print("Accuracy may be lost\n")
-            # Interpolate the relief data to the new higher resolution grid
-            digits = re.findall(r'\d+', resolution)
-            letter = re.findall(r'[a-z]', resolution)
-            new_grid_spacing = f'{(int(digits[0]) / 10)}{letter[0]}'
+class Isolines:
+        def __init__(self, map: Mapper, resolution = '01m', color = 'black', linewidth = 0.5, levels = 10, inline = False, zorder = None):
+            self.map = map
+            self.resolution = resolution
+            self.color = color
+            self.linewidth = linewidth
+            self.levels = levels
+            self.inline = inline
 
-            self.elevation = pygmt.grdsample(grid=self.elevation, spacing=new_grid_spacing, region=self.region)
+            if not zorder:
+                self.zorder = self.map.get_next_zorder()
+            else:
+                self.zorder = zorder
+                self.map.zorder = zorder
+
+            # Plot isolines
+            print("Adding isolines\n")
+            lines = pygmt.datasets.load_earth_relief(resolution=self.resolution, region=self.map.region)
+
+            grid_np = lines.values
+
+            # Remove negative values
+            grid_np[grid_np < 0] = 0
+
+            # Convert the numpy array back to a DataArray
+            lines[:] = grid_np
+
+            # Plot the data
+            cont = self.map.ax.contour(lines, levels=self.levels, colors=self.color, extent=self.map.region, linewidths=self.linewidth, zorder=zorder)
+
+            if inline:
+                self.map.ax.clabel(cont, inline=inline, fontsize=8)
 
 
-    def shade_elevation(self,zorder=None):
+class Relief:
+    def __init__(self, map: Mapper, cmap = 'terrain', resolution = '01m', interpolate=False, no_shade=False, zorder=None):
+        self.map = map
+        self.cmap = cmap
+        self.resolution = resolution
+        self.interpolate = interpolate
+        self.no_shade = no_shade
+
         if not zorder:
-            zorder = self.get_next_zorder()
+            self.zorder = self.map.get_next_zorder()
+        else:
+            self.zorder = zorder
+            self.map.zorder = zorder
 
-         # Create hillshade
+        # Plot colormap
+        # Load the relief data
+        print("Adding colormap\n")
+        self.elevation = pygmt.datasets.load_earth_relief(resolution=self.resolution, region=self.map.region)
+
+        if interpolate:
+            self.interpolate_relief(self.resolution)
+
+        # Set all negative values to 0
+        self.elevation = np.where(self.elevation >= 0, self.elevation, 0)
+
+        if not no_shade:
+            self.im = self.shade_elevation(zorder=self.zorder)
+        else:
+            self.im = self.map.ax.imshow(self.elevation.values, cmap=self.cmap, extent=self.map.region, origin='upper', zorder=self.zorder)
+
+
+    def interpolate_relief(self, resolution):
+        print("!WARNING: Interpolating the data to a higher resolution grid")
+        print("Accuracy may be lost\n")
+        # Interpolate the relief data to the new higher resolution grid
+        digits = re.findall(r'\d+', resolution)
+        letter = re.findall(r'[a-z]', resolution)
+        new_grid_spacing = f'{(int(digits[0]) / 10)}{letter[0]}'
+
+        self.elevation = pygmt.grdsample(grid=self.elevation, spacing=new_grid_spacing, region=self.map.region)
+
+
+    def shade_elevation(self, vert_exag=1.5, zorder=None):
+        # Create hillshade
         print("Shading the elevation data...\n")
         ls = LightSource(azdeg=315, altdeg=45)
-        hillshade = ls.hillshade(self.elevation, vert_exag=1.5, dx=1, dy=1)
+        hillshade = ls.hillshade(self.elevation, vert_exag=vert_exag, dx=1, dy=1)
 
         # Plot the elevation data with hillshading
-        im = self.ax.imshow(hillshade, cmap='gray', extent=self.region, origin='lower', alpha=0.5, zorder=zorder, aspect='auto')
-
-        return im
-
-
-    def plot(self):
-        self.add_legend()
-        plt.show()
+        self.im = self.map.ax.imshow(hillshade, cmap='gray', extent=self.map.region, origin='upper', alpha=0.5, zorder=zorder, aspect='auto')

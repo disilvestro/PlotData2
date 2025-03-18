@@ -1,24 +1,53 @@
+import pygmt
+import math
+import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
-import pygmt
-import numpy as np
+from plotdata.objects.section import Section
+from plotdata.objects.create_map import Mapper, Isolines, Relief
 
 def run_plot(plot_info, inps):
+    vmin = inps.vlim[0] if inps.vlim else None
+    vmax = inps.vlim[1] if inps.vlim else None
+
     fig = plt.figure(constrained_layout=True)
-    main_gs = gridspec.GridSpec(1, len(plot_info['file(s)']), figure=fig) #rows, columns
 
-    if False: #To remebmer the structure
-        # Add a subplot to the figure using the GridSpec
-        ax = fig.add_subplot(main_gs[0, 0])
+    n_plots = len(plot_info['file(s)']) + len(inps.add_plot)
+    rows = math.ceil(math.sqrt(n_plots))
+    columns = math.ceil(n_plots / rows)
 
-        # Plot something
-        ax.plot([0, 1, 2], [0, 1, 4])
+    main_gs = gridspec.GridSpec(rows, columns, figure=fig) #rows, columns
+    axes = []
 
-        # Show the plot
-        plt.show()
+    for i in range(n_plots):
+        row = i // columns
+        col = i % columns
+        ax = fig.add_subplot(main_gs[row, col])
+        axes.append(ax)
 
+    for i, file in enumerate(plot_info['file(s)']):
+        if inps.plot_type == 'horzvert':
+            mapper = Mapper(ax=axes[i], file=file)
+            if not inps.no_dem:
+                Relief(map=mapper, resolution = inps.resolution, cmap = 'terrain', interpolate=inps.interpolate, no_shade=inps.no_shade, zorder=None)
 
-def othth():
+            mapper.add_file(style=inps.style, vmin=vmin, vmax=vmax, zorder=None)
+
+            if inps.isolines != 0:
+                Isolines(map=mapper, resolution = inps.resolution, color = inps.iso_color, linewidth = inps.linewidth, levels = inps.isolines, inline = inps.inline, zorder = None) # TODO add zorder
+
+        if inps.plot_type == 'velocity':
+            pass
+        if inps.plot_type == 'vectors':
+            pass
+        if inps.plot_type == 'ifgram':
+            pass
+        if inps.plot_type == 'shaded_relief':
+            pass
+
+    plt.show()
+
+def randomstuff():
     pass
 
 

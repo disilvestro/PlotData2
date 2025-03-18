@@ -260,8 +260,6 @@ def select_reference_point(out_mskd_file, window_size, ref_lalo):
     print('-'*50)
 
 
-
-
 def draw_box(central_lat, central_lon, distance_km = 20, distance_deg = None):
     if not distance_deg:
         # Offsets in degrees conversion

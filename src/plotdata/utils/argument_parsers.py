@@ -68,6 +68,16 @@ def add_location_arguments(parser):
                         metavar=('LAT,LON or LAT LON or LAT1,LON1  LAT2,LON2'),
                         type=str,
                         help="lat/lon coords of  pixel for timeseries")
+    location.add_argument('--window_size',
+                        dest='window_size',
+                        type=int,
+                        default=3,
+                        help='window size (square side in number of pixels) for reference point look up (default: %(default)s).')
+    location.add_argument('--lat-step',
+                        dest='lat_step',
+                        type=float,
+                        default=None,
+                        help='latitude step for geocoding (default: %(default)s).')
 
     return parser
 
@@ -83,15 +93,19 @@ def add_plot_parameters_arguments(parser):
         argparse.ArgumentParser: The argument parser object with added plot parameters arguments.
     """
     plot_parameters = parser.add_argument_group('Plot parameters')
+    plot_parameters.add_argument('--plot-type',
+                        dest='plot_type',
+                        default='velocity',
+                        choices=['velocity', 'horzvert', 'vectors', 'ifgram', 'shaded_relief'],
+                        help='Type of plot: (default: %(default)s).')
     plot_parameters.add_argument('--add-event',
                         nargs='*',
                         metavar=('YYYYMMDD, YYYY-MM-DD'),
                         help='Add event to the time series')
-    plot_parameters.add_argument('--roll',
-                        type=int,
-                        metavar=('ROLL'),
-                        default=90,
-                        help='Rolling average (default: %(default)s)')
+    plot_parameters.add_argument('--style',
+                        default='pixel',
+                        choices=['pixel', 'scatter'],
+                        help='Style of the plot (default: %(default)s).')
     plot_parameters.add_argument('--no-show',
                         dest='show_flag',
                         action='store_false',
@@ -101,7 +115,13 @@ def add_plot_parameters_arguments(parser):
                         dest='font_size',
                         default=12,
                         type=int,
-                        help='fontsize for view.py (default: %(default)s)')
+                        help='fontsize for view.py (default: %(default)s).')
+    plot_parameters.add_argument('--add-plot',
+                        nargs='*',
+                        dest='add_plot',
+                        default=[],
+                        type=list,
+                        help='Add plots, ascending, descending, horizontal, vertical, vorzvert, vectors, timeseries (default: %(default)s).')
 
     return parser
 
@@ -134,13 +154,14 @@ def add_map_parameters_arguments(parser):
     map_parameters.add_argument('--isolines-color',
                         dest='iso_color',
                         type=str,
-                        default='white',
+                        default='black',
                         metavar='COLOR',
                         help='Color of contour lines (default: %(default)s).')
     map_parameters.add_argument('--linewidth',
                         type=float,
                         default=0.5,
                         help='Line width for isolines (default: %(default)s).')
+    # TODO remove, redundant
     map_parameters.add_argument('--levels',
                         type=int,
                         default=10,
@@ -162,6 +183,15 @@ def add_map_parameters_arguments(parser):
                         metavar='SIZE',
                         default=10,
                         help='Scatter marker size in points**2 (default: %(default)s).')
+    map_parameters.add_argument('--no-dem',
+                        action='store_true',
+                        help='Add relief to the map')
+    map_parameters.add_argument('--interpolate',
+                        action='store_true',
+                        help='Increase the resolution of the shaded dem')
+    map_parameters.add_argument('--no-shade',
+                        action='store_true',
+                        help='Shade the dem')
 
 
     return parser
@@ -229,5 +259,5 @@ def add_gps_arguments(parser):
                         dest='gps_dir',
                         default=None,
                         help='GPS directory (default: %(default)s).')
-    
+
     return parser

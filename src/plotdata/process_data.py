@@ -27,9 +27,10 @@ def run_prepare(inps):
     flag_save_gbis =  inps.flag_save_gbis
     out_mskd_file = []
 
-    plot_info = {plot_type: {}}
+    # plot_info = {plot_type: {}}
+    plot_info = {}
 
-    if plot_type == 'velocity' or plot_type == 'horzvert':
+    if plot_type != 'shaded_relief':
         for dir in data_dir:
             work_dir = prepend_scratchdir_if_needed(dir)
             eos_file, vel_file, geometry_file, project_base_dir, out_vel_file, inputs_folder = get_file_names(work_dir)
@@ -69,28 +70,37 @@ def run_prepare(inps):
                 run_save_gdal(eos_file, temp_coh_file)
                 out_mskd_file.append(run_mask(out_vel_file, temp_coh_file, mask_vmin))
 
-            out_mskd_file.append(out_vel_file.replace('.h5', '_msk.h5'))
+            if os.path.exists(out_vel_file.replace('.h5', '_msk.h5')):
+                out_mskd_file.append(out_vel_file.replace('.h5', '_msk.h5'))
 
-        if ref_lalo:
-            if plot_type == 'horzvert' and 'hz.h5' not in os.listdir(project_base_dir) and 'up.h5' not in os.listdir(project_base_dir):
-                select_reference_point(out_mskd_file, inps.window_size, ref_lalo)
+            else:
+                out_mskd_file.append(vel_file)
 
-                for geo_vel in out_mskd_file:
-                    run_reference_point(geo_vel, inps.window_size, ref_lalo)
+        if plot_type in ['horzvert','vectors']:
+            if 'hz.h5' not in os.listdir(project_base_dir) and 'up.h5' not in os.listdir(project_base_dir):
+                if len(out_mskd_file) != 2:
+                    raise ValueError(f'Need two velocity files for {plot_type} plot')
+
+                if ref_lalo:
+                    select_reference_point(out_mskd_file, inps.window_size, ref_lalo)
+
+                    for geo_vel in out_mskd_file:
+                        run_reference_point(geo_vel, inps.window_size, ref_lalo)
 
                 run_asc_desc2horz_vert(out_mskd_file, project_base_dir)
+            out_mskd_file = [os.path.join(project_base_dir, 'hz.h5'), os.path.join(project_base_dir, 'up.h5')]
 
         if flag_save_gbis:
             for eos, vel in zip(eos_file, out_vel_file):
                 start_date, end_date = find_nearest_start_end_date(eos, start_date, end_date)
                 save_gbis_plotdata(eos, vel, start_date, end_date)
 
-        plot_info[plot_type] = {
-                                'file(s)': out_mskd_file,
-                                'directory': project_base_dir,
-                                'start_date': start_date,
-                                'end_date': end_date
-                                }
+        plot_info = {
+                    'file(s)': out_mskd_file,
+                    'directory': project_base_dir,
+                    'start_date': start_date,
+                    'end_date': end_date
+                    }
 
     return plot_info
 
