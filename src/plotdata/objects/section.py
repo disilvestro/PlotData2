@@ -8,10 +8,10 @@ from plotdata.helper_functions import calculate_distance
 class Section():
     def __init__(self, data, region, latitude, longitude, interpolate=None) -> None:
         lat_indices, lon_indices = self.draw_line(data, region, latitude, longitude)
-        
-        # For some reason the plot are upside down on the map but not in the array
+
+        # TODO test if data needs to be flipped
         data = np.flipud(data)
-        
+
         # Extract the values data along the snapped path
         values = data[lat_indices, lon_indices]
 
@@ -69,7 +69,7 @@ class Section():
                 self.path_df['latitude'][i + 1], self.path_df['longitude'][i + 1]
             )
             distances.append(total_distance)
-        
+
         # Create a distance array that matches the length of the values data
         distance = np.linspace(0, total_distance, len(self.values))
 

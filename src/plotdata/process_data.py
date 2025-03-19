@@ -7,7 +7,6 @@
 
 import os
 from mintpy.utils import readfile
-# from mintpy.defaults.plot import *
 from mintpy.cli import reference_point, asc_desc2horz_vert, save_gdal, mask, geocode
 from plotdata.helper_functions import get_file_names
 from plotdata.helper_functions import prepend_scratchdir_if_needed, find_nearest_start_end_date
@@ -77,7 +76,10 @@ def run_prepare(inps):
                 out_mskd_file.append(vel_file)
 
         if plot_type in ['horzvert','vectors']:
-            if 'hz.h5' not in os.listdir(project_base_dir) and 'up.h5' not in os.listdir(project_base_dir):
+            horz_name = os.path.join(project_base_dir, f'hz_{start_date}_{end_date}.h5')
+            vert_name = os.path.join(project_base_dir, f'up_{start_date}_{end_date}.h5')
+
+            if not os.path.exists(horz_name) and not os.path.exists(vert_name):
                 if len(out_mskd_file) != 2:
                     raise ValueError(f'Need two velocity files for {plot_type} plot')
 
@@ -85,10 +87,10 @@ def run_prepare(inps):
                     select_reference_point(out_mskd_file, inps.window_size, ref_lalo)
 
                     for geo_vel in out_mskd_file:
-                        run_reference_point(geo_vel, inps.window_size, ref_lalo)
+                        run_reference_point(geo_vel, ref_lalo)
 
-                run_asc_desc2horz_vert(out_mskd_file, project_base_dir)
-            out_mskd_file = [os.path.join(project_base_dir, 'hz.h5'), os.path.join(project_base_dir, 'up.h5')]
+                run_asc_desc2horz_vert(out_mskd_file, horz_name=horz_name, vert_name=vert_name)
+            out_mskd_file = [horz_name, vert_name]
 
         if flag_save_gbis:
             for eos, vel in zip(eos_file, out_vel_file):
@@ -133,11 +135,11 @@ def run_mask(out_vel_file, temp_coh_file, mask_vmin):
     return out_mskd_file
 
 
-def run_reference_point(out_mskd_file, window_size, ref_lalo):
+def run_reference_point(out_mskd_file, ref_lalo):
     cmd = f'{out_mskd_file} --lat {ref_lalo[0]} --lon {ref_lalo[1]}'
     reference_point.main( cmd.split() )
 
 
-def run_asc_desc2horz_vert(mskd_file, project_base_dir):
-    cmd = f'{mskd_file[0]} {mskd_file[1]} --output {project_base_dir}/hz.h5 {project_base_dir}/up.h5'
+def run_asc_desc2horz_vert(mskd_file, horz_name, vert_name):
+    cmd = f'{mskd_file[0]} {mskd_file[1]} --output {horz_name} {vert_name}'
     asc_desc2horz_vert.main( cmd.split() )

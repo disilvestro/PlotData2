@@ -28,6 +28,7 @@ def run_plot(plot_info, inps):
     for i, file in enumerate(plot_info['file(s)']):
         if inps.plot_type == 'horzvert':
             mapper = Mapper(ax=axes[i], file=file)
+
             if not inps.no_dem:
                 Relief(map=mapper, resolution = inps.resolution, cmap = 'terrain', interpolate=inps.interpolate, no_shade=inps.no_shade, zorder=None)
 
@@ -41,9 +42,18 @@ def run_plot(plot_info, inps):
         if inps.plot_type == 'vectors':
             pass
         if inps.plot_type == 'ifgram':
-            pass
+            mapper = Mapper(ax=axes[i], file=file)
+
+            if not inps.no_dem:
+                Relief(map=mapper, resolution = inps.resolution, cmap = 'terrain', interpolate=inps.interpolate, no_shade=inps.no_shade, zorder=None)
+
+            mapper.add_file(style=inps.style, vmin=vmin, vmax=vmax, zorder=None)
+
+            if inps.isolines != 0:
+                Isolines(map=mapper, resolution = inps.resolution, color = inps.iso_color, linewidth = inps.linewidth, levels = inps.isolines, inline = inps.inline, zorder = None) # TODO add zorder
+
         if inps.plot_type == 'shaded_relief':
-            pass
+            Relief(map=mapper, resolution = inps.resolution, interpolate=inps.interpolate, no_shade=inps.no_shade, zorder=None)
 
     plt.show()
 

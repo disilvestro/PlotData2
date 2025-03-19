@@ -178,7 +178,8 @@ def parse_lalo(str_lalo):
     return lalo
 
 
-############################################################
+######################### MAIN #############################
+
 def main(iargs=None):
 
     # logging_function.log(os.getcwd(), os.path.basename(__file__) + ' ' + ' '.join(sys.argv[1:]))
@@ -192,9 +193,10 @@ def main(iargs=None):
 
     # extract_volcanoes_info('', 'Kilauea', inps.start_date, inps.end_date)
     plot_info = run_prepare(inps)
-    run_plot(plot_info, inps)
 
-    return
+    if inps.show_flag:
+        run_plot(plot_info, inps)
+
 ############################################################
 
 if __name__ == '__main__':

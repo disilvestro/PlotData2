@@ -8,13 +8,14 @@ import re
 import pygmt
 import numpy as np
 from mintpy.utils import readfile
+from datetime import datetime
 from matplotlib import pyplot as plt
 from matplotlib.colors import LightSource
 from plotdata.helper_functions import parse_polygon, get_bounding_box
 
 
 class Mapper():
-    def __init__(self, region=None, polygon=None, location_types: dict = {},ax=None, file=None):
+    def __init__(self, region=None, polygon=None, location_types: dict = {}, ax=None, file=None):
         if not ax:
             self.fig = plt.figure(figsize=(8, 8))
             self.ax = self.fig.add_subplot(111)
@@ -24,7 +25,9 @@ class Mapper():
             self.fig = ax.get_figure()
 
         if file:
-            self.data, self.metadata = readfile.read(file)
+            self.velocity, self.metadata = readfile.read(file)
+            self.start_date = datetime.strptime(self.metadata['START_DATE'], '%Y%m%d')
+            self.end_date = datetime.strptime(self.metadata['END_DATE'], '%Y%m%d')
             latitude, longitude = get_bounding_box(self.metadata)
             self.region = [longitude[0], longitude[1], latitude[0], latitude[1]]
 
@@ -43,6 +46,12 @@ class Mapper():
         z = self.zorder
         self.zorder += 1
         return z
+
+    def calculate_displacement(self):
+        self.start_date = datetime.strptime(self.metadata['START_DATE'], '%Y%m%d')
+        self.end_date = datetime.strptime(self.metadata['END_DATE'], '%Y%m%d')
+        days = (self.end_date - self.start_date).days
+        self.displacement = (self.velocity * days / 365.25) # In centimeters
 
 
     def plot(self):
@@ -93,14 +102,21 @@ class Mapper():
         if not zorder:
             zorder = self.get_next_zorder()
 
-        # TODO add displacement
-        # self.data = self.data * 120/365 
+        if style == 'ifgram':
+            if not hasattr(self, 'displacement'):
+                self.calculate_displacement()
+
+            data_phase = (2 * np.pi / float(self.metadata['WAVELENGTH'])) * self.displacement
+            data_wrapped = np.mod(data_phase, 2 * np.pi)
+            imdata = self.ax.imshow(data_wrapped, cmap='jet', extent=self.region, origin='upper', interpolation='none',zorder=zorder, vmin=0, vmax=2 * np.pi)
+            plt.colorbar(imdata, ax=self.ax, orientation='vertical')
+
         if style == 'pixel':
-            self.imdata = self.ax.imshow(self.data, cmap='jet', extent=self.region, origin='upper', interpolation='none',zorder=zorder, vmin=vmin, vmax=vmax)
+            self.imdata = self.ax.imshow(self.velocity, cmap='jet', extent=self.region, origin='upper', interpolation='none',zorder=zorder, vmin=vmin, vmax=vmax)
 
         elif style == 'scatter':
-            # Assuming self.data is a 2D numpy array
-            data = self.data
+            # Assuming self.velocity is a 2D numpy array
+            data = self.velocity
             nrows, ncols = data.shape
             x = np.linspace(self.region[0], self.region[1], ncols)
             y = np.linspace(self.region[2], self.region[3], nrows)
