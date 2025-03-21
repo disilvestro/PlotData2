@@ -25,6 +25,9 @@ def run_prepare(inps):
     mask_vmin = inps.mask_vmin
     flag_save_gbis =  inps.flag_save_gbis
     out_mskd_file = []
+    horz_name = []
+    vert_name = []
+    project_base_dir = None
 
     # plot_info = {plot_type: {}}
     plot_info = {}
@@ -35,8 +38,10 @@ def run_prepare(inps):
             eos_file, vel_file, geometry_file, project_base_dir, out_vel_file, inputs_folder = get_file_names(work_dir)
             start_date, end_date = find_nearest_start_end_date(eos_file, inps.start_date, inps.end_date)
             temp_coh_file=out_vel_file.replace('velocity.h5','temporalCoherence.tif')
-            velfile_fullpath = root_dir, out_vel_file #???
             metadata = None
+            if inps.start_date and inps.end_date:
+                horz_name.append(os.path.join(project_base_dir, f'hz_{inps.start_date}_{inps.end_date}.h5'))
+                vert_name.append(os.path.join(project_base_dir, f'up_{inps.start_date}_{inps.end_date}.h5'))
 
             if os.path.exists(out_vel_file):
                 metadata = readfile.read(out_vel_file)[1]
@@ -76,10 +81,7 @@ def run_prepare(inps):
                 out_mskd_file.append(vel_file)
 
         if plot_type in ['horzvert','vectors']:
-            horz_name = os.path.join(project_base_dir, f'hz_{start_date}_{end_date}.h5')
-            vert_name = os.path.join(project_base_dir, f'up_{start_date}_{end_date}.h5')
-
-            if not os.path.exists(horz_name) and not os.path.exists(vert_name):
+            if not os.path.exists(horz_name[0]) and not os.path.exists(vert_name[0]):
                 if len(out_mskd_file) != 2:
                     raise ValueError(f'Need two velocity files for {plot_type} plot')
 
@@ -89,20 +91,23 @@ def run_prepare(inps):
                     for geo_vel in out_mskd_file:
                         run_reference_point(geo_vel, ref_lalo)
 
-                run_asc_desc2horz_vert(out_mskd_file, horz_name=horz_name, vert_name=vert_name)
-            out_mskd_file = [horz_name, vert_name]
+                run_asc_desc2horz_vert(out_mskd_file, horz_name=horz_name[0], vert_name=vert_name[0])
+            # out_mskd_file = [horz_name, vert_name]
 
         if flag_save_gbis:
             for eos, vel in zip(eos_file, out_vel_file):
                 start_date, end_date = find_nearest_start_end_date(eos, start_date, end_date)
                 save_gbis_plotdata(eos, vel, start_date, end_date)
 
-        plot_info = {
-                    'file(s)': out_mskd_file,
-                    'directory': project_base_dir,
-                    'start_date': start_date,
-                    'end_date': end_date
-                    }
+    plot_info = {
+                'ascending': [item for item in out_mskd_file if 'SenA' in item],
+                'descending': [item for item in out_mskd_file if 'SenD' in item],
+                'horizontal': set(horz_name),
+                'vertical': set(vert_name),
+                'directory': project_base_dir,
+                'start_date': start_date,
+                'end_date': end_date
+                }
 
     return plot_info
 

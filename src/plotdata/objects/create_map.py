@@ -47,11 +47,12 @@ class Mapper():
         self.zorder += 1
         return z
 
+
     def calculate_displacement(self):
         self.start_date = datetime.strptime(self.metadata['START_DATE'], '%Y%m%d')
         self.end_date = datetime.strptime(self.metadata['END_DATE'], '%Y%m%d')
         days = (self.end_date - self.start_date).days
-        self.displacement = (self.velocity * days / 365.25) # In centimeters
+        self.displacement = (self.velocity * days / 365.25) # In meters
 
 
     def plot(self):
@@ -98,25 +99,28 @@ class Mapper():
         # self.ax.text(longitude[1], latitude[1], 'B', fontsize=10, ha='left', color=color)
 
 
-    def add_file(self, style='pixel', vmin=None, vmax=None, zorder=None):
+    def add_file(self, style='pixel', vmin=None, vmax=None, zorder=None, cmap='jet', movement='velocity'):
         if not zorder:
             zorder = self.get_next_zorder()
 
-        if style == 'ifgram':
-            if not hasattr(self, 'displacement'):
-                self.calculate_displacement()
+        if not hasattr(self, 'displacement'):
+            self.calculate_displacement()
 
+        data = self.displacement if movement == 'displacement' else self.velocity
+        label = 'Displacement (m)' if movement == 'displacement' else 'Velocity (m/yr)'
+
+        if style == 'ifgram':
+            label = 'Displacement (m)'
             data_phase = (2 * np.pi / float(self.metadata['WAVELENGTH'])) * self.displacement
             data_wrapped = np.mod(data_phase, 2 * np.pi)
-            imdata = self.ax.imshow(data_wrapped, cmap='jet', extent=self.region, origin='upper', interpolation='none',zorder=zorder, vmin=0, vmax=2 * np.pi)
-            plt.colorbar(imdata, ax=self.ax, orientation='vertical')
+            self.imdata = self.ax.imshow(data_wrapped, cmap=cmap, extent=self.region, origin='upper', interpolation='none',zorder=self.zorder, vmin=0, vmax=2 * np.pi)
 
         if style == 'pixel':
-            self.imdata = self.ax.imshow(self.velocity, cmap='jet', extent=self.region, origin='upper', interpolation='none',zorder=zorder, vmin=vmin, vmax=vmax)
+            self.imdata = self.ax.imshow(data, cmap=cmap, extent=self.region, origin='upper', interpolation='none',zorder=self.zorder, vmin=vmin, vmax=vmax)
 
         elif style == 'scatter':
             # Assuming self.velocity is a 2D numpy array
-            data = self.velocity
+            data = data
             nrows, ncols = data.shape
             x = np.linspace(self.region[0], self.region[1], ncols)
             y = np.linspace(self.region[2], self.region[3], nrows)
@@ -125,7 +129,9 @@ class Mapper():
             Y = np.flip(Y.flatten())
             C = data.flatten()
 
-            self.imdata = self.ax.scatter(X, Y, c=C, cmap='jet', marker='o', zorder=zorder, s=2, vmin=vmin, vmax=vmax)
+            self.imdata = self.ax.scatter(X, Y, c=C, cmap=cmap, marker='o', zorder=zorder, s=2, vmin=vmin, vmax=vmax)
+        print(self.imdata)
+        # plt.colorbar(self.imdata, ax=self.ax, orientation='vertical', label=label)
 
 
 class Isolines:
@@ -156,7 +162,7 @@ class Isolines:
             lines[:] = grid_np
 
             # Plot the data
-            cont = self.map.ax.contour(lines, levels=self.levels, colors=self.color, extent=self.map.region, linewidths=self.linewidth, zorder=zorder)
+            cont = self.map.ax.contour(lines, levels=self.levels, colors=self.color, extent=self.map.region, linewidths=self.linewidth, zorder=self.zorder)
 
             if inline:
                 self.map.ax.clabel(cont, inline=inline, fontsize=8)
@@ -190,7 +196,8 @@ class Relief:
         if not no_shade:
             self.im = self.shade_elevation(zorder=self.zorder)
         else:
-            self.im = self.map.ax.imshow(self.elevation.values, cmap=self.cmap, extent=self.map.region, origin='upper', zorder=self.zorder)
+            print('here')
+            self.im = self.map.ax.imshow(self.elevation.values, cmap=self.cmap, extent=self.map.region, origin='lower', zorder=self.zorder)
 
 
     def interpolate_relief(self, resolution):
@@ -211,4 +218,4 @@ class Relief:
         hillshade = ls.hillshade(self.elevation, vert_exag=vert_exag, dx=1, dy=1)
 
         # Plot the elevation data with hillshading
-        self.im = self.map.ax.imshow(hillshade, cmap='gray', extent=self.map.region, origin='upper', alpha=0.5, zorder=zorder, aspect='auto')
+        self.im = self.map.ax.imshow(hillshade, cmap='gray', extent=self.map.region, origin='lower', alpha=0.5, zorder=zorder, aspect='auto')

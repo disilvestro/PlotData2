@@ -84,7 +84,7 @@ def create_parser():
         inps.plot_box = [float(val) for val in inps.plot_box.replace(':', ',').split(',')]  # converts to plot_box=[19.3, 19.6, -155.8, -155.4]
 
     if inps.polygon:
-        inps.plot_box = parse_polygon(inps.polygon)
+        inps.region = parse_polygon(inps.polygon)
 
     if inps.lalo:
         inps.lalo = parse_lalo(inps.lalo)
@@ -113,6 +113,9 @@ def create_parser():
             except ValueError:
                 msg = 'Date format not valid, it must be in the format YYYYMMDD or YYYY-MM-DD'
                 raise ValueError(msg)
+
+    if inps.plot_type == 'ifgram':
+        inps.style = 'ifgram'
 
 ##### Hardwired for Hawaii #####
     if 'GPSDIR' in os.environ:
@@ -155,7 +158,7 @@ def parse_polygon(polygon):
     longitude = [round(min(longitude),2), round(max(longitude),2)]
     latitude = [round(min(latitude),2), round(max(latitude),2)]
 
-    return [latitude, longitude]
+    return [round(min(longitude),2), round(max(longitude),2), round(min(latitude),2), round(max(latitude),2)]
 
 
 def parse_lalo(str_lalo):

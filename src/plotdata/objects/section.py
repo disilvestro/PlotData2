@@ -10,7 +10,8 @@ class Section():
         lat_indices, lon_indices = self.draw_line(data, region, latitude, longitude)
 
         # TODO test if data needs to be flipped
-        data = np.flipud(data)
+        if False:
+            data = np.flipud(data)
 
         # Extract the values data along the snapped path
         values = data[lat_indices, lon_indices]
@@ -24,7 +25,7 @@ class Section():
         self.values = np.nan_to_num(self.values)
 
 
-    def draw_line(self, data, region,latitude, longitude):
+    def draw_line(self, data, region, latitude, longitude):
         # Calculate the resolution in degrees
         lat_res = (region[3] - region[2]) / (data.shape[0] - 1)
         lon_res = (region[1] - region[0]) / (data.shape[1] - 1)
@@ -34,7 +35,6 @@ class Section():
 
         # Determine the number of points based on the distance
         num_points = int(distance / min(lat_res, lon_res))
-
 
         lon_points = np.linspace(longitude[0], longitude[1], num_points)
         lat_points = np.linspace(latitude[0], latitude[1], num_points)
@@ -59,7 +59,7 @@ class Section():
         return lat_indices, lon_indices
 
 
-    def plot_line(self, ax=None):
+    def plot_line(self, ax=None, zorder=None):
         total_distance = 0
         distances = [0]
 
@@ -74,7 +74,7 @@ class Section():
         distance = np.linspace(0, total_distance, len(self.values))
 
         # Plot the values data against the distance array
-        ax.plot(distance, self.values, 'k-', linewidth=1)
+        ax.plot(distance, self.values, 'k-', linewidth=1, zorder=zorder)
         ax.set_ylabel("values (m)")
         ax.set_xlabel("Length (km)")
         ax.set_ylim([min(self.values) * 0.9 , max(self.values) * 1.1])
@@ -90,7 +90,7 @@ class Section():
                 self.path_df['latitude'][i + 1], self.path_df['longitude'][i + 1]
             )
             distances.append(total_distance)
-        
+
         # Create a distance array that matches the length of the values data
         distance = np.linspace(0, total_distance, len(self.values))
 

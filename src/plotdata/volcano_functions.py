@@ -73,7 +73,20 @@ def volcanoes_list(jsonfile):
     return volcanoName
 
 
-def extract_volcanoes_info(jsonfile, volcanoName, start_date, end_date,strength=False):
+def get_volcano_coord_id(jsonfile, volcanoName: str):
+    data = get_volcano_json(jsonfile, JSON_DOWNLOAD_URL)
+
+    for j in data['features']:
+        if j['properties']['VolcanoName'] == volcanoName:
+            id = j['properties']['VolcanoNumber']
+
+            coordinates = j['geometry']['coordinates']
+            coordinates = coordinates[::-1]
+
+            return coordinates, id
+
+
+def get_volcano_event(jsonfile, volcanoName: str, start_date, end_date, strength = 0):
     """
     Extracts information about a specific volcano from a JSON file.
 
@@ -84,16 +97,17 @@ def extract_volcanoes_info(jsonfile, volcanoName, start_date, end_date,strength=
     Returns:
         tuple: A tuple containing the start dates of eruptions, a date list, and the coordinates of the volcano.
     """
-    column_names = ['Volcano', 'Start', 'End', 'Max Explosivity']
-
-    data = get_volcano_json(jsonfile, JSON_DOWNLOAD_URL)
-
-    start_dates = []
+    volcano = {f"{volcanoName}": {},}
+    column_names = ['Start', 'End', 'Max Explosivity']
     frame_data = []
     name = ''
 
-    first_day = datetime.strptime(start_date, '%Y%m%d').date()
-    last_day = datetime.strptime(end_date, '%Y%m%d').date()
+    data = get_volcano_json(jsonfile, JSON_DOWNLOAD_URL)
+
+    first_day = datetime.strptime(start_date, '%Y%m%d').date() if isinstance(start_date, str) else start_date
+    last_day = datetime.strptime(end_date, '%Y%m%d').date() if isinstance(end_date, str) else end_date
+
+    strength = int(strength)
 
     # Iterate over the features in the data
     for j in data['features']:
@@ -102,50 +116,45 @@ def extract_volcanoes_info(jsonfile, volcanoName, start_date, end_date,strength=
             name = (j['properties']['VolcanoName'])
             start = datetime.strptime((j['properties']['StartDate']), '%Y%m%d').date()
 
-            coordinates = j['geometry']['coordinates']
-            coordinates = coordinates[::-1]
             try:
                 end = datetime.strptime((j['properties']['EndDate']), '%Y%m%d').date()
 
             except:
                 end = 'None'
 
+            coordinates = j['geometry']['coordinates']
+
+            volcano[name] = {"id": id,
+                             "coordinates": coordinates[::-1]}
+
             print(f'{name} (id: {id}) eruption started {start} and ended {end}')
 
             # If the start date is within the date range
             if start >= first_day and start <= last_day:
-                start_dates.append(start)
+                # start_dates.append(start)
+                if j['properties']['ExplosivityIndexMax'] >= strength:
+                    frame_data.append([start, end, j['properties']['ExplosivityIndexMax']])
 
-            if strength:
-                stren = j['properties']['ExplosivityIndexMax']
-                frame_data.append([name, start, end, stren])
+    if name == '':
+        raise ValueError(f'Volcano {volcanoName} not found, check for typos')
 
-    if strength:
-    # If no start dates were found within the date range
+    if frame_data != []:
         df = pd.DataFrame(frame_data, columns=column_names)
-        return df
-
-    # else:
-    #     if not start_dates:
-    #         # Print an error message and exit the program
-    #         msg = f'Error: {volcanoName} eruption date is out of range'
-    #         raise ValueError(msg)
-
-    if start_dates != []:
-
-        start_dates = sorted(start_dates)
-
         print('-'*50)
         print('Sorting eruptions by date...')
         print('-'*50)
-        for d in start_dates:
+
+        df.sort_values(by='Start', inplace=True)
+        volcano[name]['eruptions'] = df
+
+        for d in df['Start']:
             print('Extracted eruption in date: ', d)
 
         print('-'*50)
 
     print('')
 
-    return start_dates, coordinates, id
+    return volcano
 
 # TODO see if xlsx file is needed
 # def get_volcanoes():
