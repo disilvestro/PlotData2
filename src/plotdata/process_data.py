@@ -30,7 +30,15 @@ def run_prepare(inps):
     project_base_dir = None
 
     # plot_info = {plot_type: {}}
-    plot_info = {}
+    plot_info = {
+            'ascending': [],
+            'descending': [],
+            'horizontal': [],
+            'vertical': [],
+            'directory': None,
+            'start_date': None,
+            'end_date': None
+            }
 
     if plot_type != 'shaded_relief':
         for dir in data_dir:
@@ -39,6 +47,7 @@ def run_prepare(inps):
             start_date, end_date = find_nearest_start_end_date(eos_file, inps.start_date, inps.end_date)
             temp_coh_file=out_vel_file.replace('velocity.h5','temporalCoherence.tif')
             metadata = None
+
             if inps.start_date and inps.end_date:
                 horz_name.append(os.path.join(project_base_dir, f'hz_{inps.start_date}_{inps.end_date}.h5'))
                 vert_name.append(os.path.join(project_base_dir, f'up_{inps.start_date}_{inps.end_date}.h5'))
@@ -102,11 +111,11 @@ def run_prepare(inps):
     plot_info = {
                 'ascending': [item for item in out_mskd_file if 'SenA' in item],
                 'descending': [item for item in out_mskd_file if 'SenD' in item],
-                'horizontal': set(horz_name),
-                'vertical': set(vert_name),
+                'horizontal': list(set(horz_name)),
+                'vertical': list(set(vert_name)),
                 'directory': project_base_dir,
-                'start_date': start_date,
-                'end_date': end_date
+                'start_date': inps.start_date,
+                'end_date': inps.end_date
                 }
 
     return plot_info

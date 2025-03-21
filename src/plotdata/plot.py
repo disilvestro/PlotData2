@@ -10,34 +10,59 @@ from plotdata.objects.create_map import Mapper, Isolines, Relief
 def run_plot(plot_info, inps):
     vmin = inps.vlim[0] if inps.vlim else None
     vmax = inps.vlim[1] if inps.vlim else None
-
     fig = plt.figure()
+    plots = []
+
+    if inps.plot_type == 'velocity' or inps.plot_type == 'displacement':
+        plots.append('ascending')
+        plots.append('descending')
 
     if inps.plot_type == 'horzvert':
-        for file in plot_info['vertical']:
-            inps.add_plot.insert(0, 'vertical')
-        for file in plot_info['horizontal']:
-            inps.add_plot.insert(0, 'horizontal')
-    if inps.plot_type == 'velocity':
-        for file in plot_info['ascending']:
-            inps.add_plot.insert(0, 'ascending')
-        for file in plot_info['descending']:
-            inps.add_plot.insert(0, 'descending')
+        plots.append('horizontal')
+        plots.append('vertical')
 
+    if inps.plot_type == 'shaded_relief':
+        plots.append('shaded_relief')
 
-    rows = math.ceil(math.sqrt(len(inps.add_plot)))
-    columns = math.ceil(len(inps.add_plot) / rows)
+    if inps.plot_type == 'horizontal':
+        plots.append('horizontal')
+
+    if inps.plot_type == 'vertical':
+        plots.append('vertical')
+
+    if inps.plot_type == 'vectors':
+        if 'ascending' in inps.add_plot:
+            for file in plot_info['ascending']:
+                inps.plot_type.append('ascending')
+
+        if 'descending' in inps.add_plot:
+            for file in plot_info['descending']:
+                inps.plot_type.append('descending')
+
+        if 'horizontal' in inps.add_plot:
+            for file in plot_info['horizontal']:
+                inps.plot_type.append('horizontal')
+
+        if 'vertical' in inps.add_plot:
+            for file in plot_info['vertical']:
+                inps.plot_type.append('vertical')
+
+    if inps.plot_type == 'timeseries':
+        pass
+
+    rows = math.ceil(math.sqrt(len(plots)))
+    columns = math.ceil(len(plots) / rows)
 
     main_gs = gridspec.GridSpec(rows, columns, figure=fig) #rows, columns
     axes = []
 
-    for i in range(len(inps.add_plot)):
+    for i in range(len(plots)):
         row = i // columns
         col = i % columns
         ax = fig.add_subplot(main_gs[row, col])
         axes.append(ax)
 
-    for i, plot in enumerate(inps.add_plot):
+    for i, plot in enumerate(plots):
         if plot == 'ascending':
             file = plot_info['ascending'][0]
             plot_info['ascending'].remove(file)
@@ -63,11 +88,11 @@ def run_plot(plot_info, inps):
             Relief(map=rel_map, resolution = inps.resolution, interpolate=inps.interpolate, no_shade=inps.no_shade, zorder=None)
 
         if plot == 'vectors':
-            if 'hz' in file:
-                horz_section = Section(file)
+            plot_info['horizontal'][0]
+            horz_section = Section(file)
 
-            if 'up' in file:
-                vert_section = Section(file)
+            plot_info['vertical'][0]
+            vert_section = Section(file)
 
     print('Plot order ', inps.add_plot)
     plt.tight_layout()

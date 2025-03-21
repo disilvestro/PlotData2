@@ -96,14 +96,14 @@ def add_plot_parameters_arguments(parser):
     plot_parameters.add_argument('--plot-type',
                         dest='plot_type',
                         default='velocity',
-                        choices=['velocity', 'horzvert', 'vectors', 'shaded_relief', 'globe', 'timeseries'],
+                        choices=['velocity', 'deformation','horzvert', 'vectors', 'shaded_relief', 'globe', 'timeseries'],
                         help='Type of plot: (default: %(default)s).')
     plot_parameters.add_argument('--add-event',
                         nargs='*',
                         metavar=('YYYYMMDD, YYYY-MM-DD'),
                         help='Add event to the time series')
     plot_parameters.add_argument('--style',
-                        default='pixel',
+                        default='scatter',
                         choices=['pixel', 'scatter', 'ifgram'],
                         help='Style of the plot (default: %(default)s).')
     plot_parameters.add_argument('--no-show',
@@ -121,7 +121,7 @@ def add_plot_parameters_arguments(parser):
                         dest='add_plot',
                         default=[],
                         type=str,
-                        help='Add plots, ascending, descending, horizontal, vertical, horzvert, vectors, timeseries (default: %(default)s).')
+                        help='Add plots, ascending, descending, horizontal, vertical, vectors, timeseries (default: %(default)s).')
     plot_parameters.add_argument('--movement',
                         default='velocity',
                         choices=['velocity', 'displacement'],

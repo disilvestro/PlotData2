@@ -99,7 +99,7 @@ class Mapper():
         # self.ax.text(longitude[1], latitude[1], 'B', fontsize=10, ha='left', color=color)
 
 
-    def add_file(self, style='pixel', vmin=None, vmax=None, zorder=None, cmap='jet', movement='velocity'):
+    def add_file(self, style='scatter', vmin=None, vmax=None, zorder=None, cmap='jet', movement='velocity'):
         if not zorder:
             zorder = self.get_next_zorder()
 
