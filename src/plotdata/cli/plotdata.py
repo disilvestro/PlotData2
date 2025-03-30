@@ -8,6 +8,9 @@ import os
 import re
 import sys
 
+# The asgeo import breaks when called by readfile.py unless I do the following
+from osgeo import gdal, osr
+
 sys.path.insert(0, '/Users/giacomo/code/Playground/Plot_data2/src')
 import argparse
 from datetime import datetime
@@ -52,6 +55,8 @@ def create_parser():
     parser.add_argument('--unit', dest='unit', default="cm", help='InSAR units (Default: cm)')
     parser.add_argument('--mask-thresh', dest='mask_vmin', type=float, default=0.7, help='coherence threshold for masking (Default: 0.7)')
     parser.add_argument("--noreference", dest="show_reference_point",  action='store_false', default=True, help="hide reference point (default: False)" )
+    parser.add_argument("--section", dest="line", nargs=4, metavar="LON1 LON2 LAT1 LAT2", type=float, default=None, help="Section coordinates for deformation vectors")
+    parser.add_argument("--resample-vector", dest="resample_vector", type=int, default=1, help="resample factor for deformation vectors (default: %(default)s).")
     # parser.add_argument('--window_size', dest='window_size', type=int, default=3, help='window size (square side in number of pixels) for reference point look up (default: %(default)s).')
     # parser.add_argument('--lat-step', dest='lat_step', type=float, default=None, help='latitude step for geocoding (default: %(default)s).')
     # parser.add_argument('--subset-lalo',  nargs='?', dest='plot_box', type=str, default=None, help='geographic area plotted')
@@ -96,11 +101,12 @@ def create_parser():
         inps.dem_file = os.path.expandvars(inps.dem_file)
 
     if inps.period:
-        delimiters = '[,:\-\s]'
-        dates = re.split(delimiters, inps.period)
+        for p in inps.period:
+            delimiters = '[,:\-\s]'
+            dates = re.split(delimiters, p)
 
-        inps.start_date = dates[0]
-        inps.end_date = dates[1]
+            inps.start_date.append(dates[0])
+            inps.end_date.append(dates[1])
 
     if inps.add_event:
         try:
@@ -116,6 +122,9 @@ def create_parser():
 
     if inps.plot_type == 'ifgram':
         inps.style = 'ifgram'
+
+    if inps.line:
+        inps.line = [(inps.line[0],inps.line[1]), (inps.line[2],inps.line[3])]
 
 ##### Hardwired for Hawaii #####
     if 'GPSDIR' in os.environ:
@@ -184,7 +193,6 @@ def parse_lalo(str_lalo):
 ######################### MAIN #############################
 
 def main(iargs=None):
-
     # logging_function.log(os.getcwd(), os.path.basename(__file__) + ' ' + ' '.join(sys.argv[1:]))
 
     inps = create_parser()
@@ -192,7 +200,6 @@ def main(iargs=None):
     # import
     from Plot_data2.src.plotdata.process_data import run_prepare
     from Plot_data2.src.plotdata.plot import run_plot
-    # from plotdata.volcano_functions import extract_volcanoes_info
 
     # extract_volcanoes_info('', 'Kilauea', inps.start_date, inps.end_date)
     plot_info = run_prepare(inps)

@@ -28,95 +28,87 @@ def run_prepare(inps):
     horz_name = []
     vert_name = []
     project_base_dir = None
+    plot_info = {}
 
-    # plot_info = {plot_type: {}}
-    plot_info = {
-            'ascending': [],
-            'descending': [],
-            'horizontal': [],
-            'vertical': [],
-            'directory': None,
-            'start_date': None,
-            'end_date': None
-            }
+    for start, end in zip(inps.start_date, inps.end_date):
+        if plot_type != 'shaded_relief':
+            for dir in data_dir:
+                work_dir = prepend_scratchdir_if_needed(dir)
+                eos_file, vel_file, geometry_file, project_base_dir, out_vel_file, inputs_folder = get_file_names(work_dir)
+                out_vel_file = out_vel_file.replace('.h5', f'_{start}_{end}.h5')
+                start_date, end_date = find_nearest_start_end_date(eos_file, start, end)
+                temp_coh_file=out_vel_file.replace(f'velocity_{start}_{end}.h5','temporalCoherence.tif')
+                metadata = None
 
-    if plot_type != 'shaded_relief':
-        for dir in data_dir:
-            work_dir = prepend_scratchdir_if_needed(dir)
-            eos_file, vel_file, geometry_file, project_base_dir, out_vel_file, inputs_folder = get_file_names(work_dir)
-            start_date, end_date = find_nearest_start_end_date(eos_file, inps.start_date, inps.end_date)
-            temp_coh_file=out_vel_file.replace('velocity.h5','temporalCoherence.tif')
-            metadata = None
+                if start and end:
+                    horz_name = os.path.join(project_base_dir, f'hz_{start}_{end}.h5')
+                    vert_name = os.path.join(project_base_dir, f'up_{start}_{end}.h5')
 
-            if inps.start_date and inps.end_date:
-                horz_name.append(os.path.join(project_base_dir, f'hz_{inps.start_date}_{inps.end_date}.h5'))
-                vert_name.append(os.path.join(project_base_dir, f'up_{inps.start_date}_{inps.end_date}.h5'))
-
-            if os.path.exists(out_vel_file):
-                metadata = readfile.read(out_vel_file)[1]
-                if start_date != metadata['START_DATE'] or end_date != metadata['END_DATE']:
-                    # Convert timeseries to velocity
+                if os.path.exists(out_vel_file):
+                    metadata = readfile.read(out_vel_file)[1]
+                    if start_date != metadata['START_DATE'] or end_date != metadata['END_DATE']:
+                        # Convert timeseries to velocity
+                        run_timeseries2velocity(eos_file, start_date, end_date, out_vel_file)
+                else:
                     run_timeseries2velocity(eos_file, start_date, end_date, out_vel_file)
 
-            if not metadata:
-                metadata = readfile.read(out_vel_file)[1]
+                if not metadata:
+                    metadata = readfile.read(out_vel_file)[1]
 
-            if 'Y_STEP' in metadata:
-                print(f'{out_vel_file} already geocoded, skipping ...')
+                if 'Y_STEP' in metadata:
+                    print('-'*50)
+                    print(f'{out_vel_file} already geocoded, skipping ...')
 
-            # Geocode the velocity file
-            else:
-                if not ref_lalo:
-                    for key in ['LAT_REF1', 'REF_LAT']:
-                        if key in metadata:
-                            ref_lat = metadata[key]
-                            break
+                # Geocode the velocity file
+                else:
+                    if not ref_lalo:
+                        for key in ['LAT_REF1', 'REF_LAT']:
+                            if key in metadata:
+                                ref_lat = metadata[key]
+                                break
 
-                lat_step = inps.lat_step if inps.lat_step else metadata['mintpy.geocode.laloStep'].split(',')[0]
+                    lat_step = inps.lat_step if inps.lat_step else metadata['mintpy.geocode.laloStep'].split(',')[0]
 
-                run_geocode(ref_lat, lat_step, project_base_dir, vel_file)
+                    run_geocode(ref_lat, lat_step, project_base_dir, vel_file)
 
-                # Go back to SCRACTDIR
-                os.chdir(root_dir)
+                    # Go back to SCRACTDIR
+                    os.chdir(root_dir)
 
-            if not os.path.exists(temp_coh_file):
-                run_save_gdal(eos_file, temp_coh_file)
-                out_mskd_file.append(run_mask(out_vel_file, temp_coh_file, mask_vmin))
+                if not os.path.exists(temp_coh_file):
+                    run_save_gdal(eos_file, temp_coh_file)
 
-            if os.path.exists(out_vel_file.replace('.h5', '_msk.h5')):
-                out_mskd_file.append(out_vel_file.replace('.h5', '_msk.h5'))
+                if not os.path.exists(out_vel_file.replace('.h5', '_msk.h5')):
+                    out_mskd_file.append(run_mask(out_vel_file, temp_coh_file, mask_vmin))
 
-            else:
-                out_mskd_file.append(vel_file)
+                else:
+                    out_mskd_file.append(out_vel_file.replace('.h5', '_msk.h5'))
 
-        if plot_type in ['horzvert','vectors']:
-            if not os.path.exists(horz_name[0]) and not os.path.exists(vert_name[0]):
-                if len(out_mskd_file) != 2:
-                    raise ValueError(f'Need two velocity files for {plot_type} plot')
+            if plot_type in ['horzvert','vectors']:
+                if not os.path.exists(horz_name) or not os.path.exists(vert_name):
+                    if len(out_mskd_file) != 2:
+                        raise ValueError(f'Need two velocity files for {plot_type} plot')
 
-                if ref_lalo:
-                    select_reference_point(out_mskd_file, inps.window_size, ref_lalo)
+                    if ref_lalo:
+                        select_reference_point(out_mskd_file, inps.window_size, ref_lalo)
 
-                    for geo_vel in out_mskd_file:
-                        run_reference_point(geo_vel, ref_lalo)
+                        for geo_vel in out_mskd_file:
+                            run_reference_point(geo_vel, ref_lalo)
 
-                run_asc_desc2horz_vert(out_mskd_file, horz_name=horz_name[0], vert_name=vert_name[0])
-            # out_mskd_file = [horz_name, vert_name]
+                    run_asc_desc2horz_vert(out_mskd_file, horz_name=horz_name, vert_name=vert_name)
 
-        if flag_save_gbis:
-            for eos, vel in zip(eos_file, out_vel_file):
-                start_date, end_date = find_nearest_start_end_date(eos, start_date, end_date)
-                save_gbis_plotdata(eos, vel, start_date, end_date)
+            if flag_save_gbis:
+                for eos, vel in zip(eos_file, out_vel_file):
+                    start_date, end_date = find_nearest_start_end_date(eos, start_date, end_date)
+                    save_gbis_plotdata(eos, vel, start_date, end_date)
 
-    plot_info = {
-                'ascending': [item for item in out_mskd_file if 'SenA' in item],
-                'descending': [item for item in out_mskd_file if 'SenD' in item],
-                'horizontal': list(set(horz_name)),
-                'vertical': list(set(vert_name)),
-                'directory': project_base_dir,
-                'start_date': inps.start_date,
-                'end_date': inps.end_date
-                }
+        plot_info[f"{start}:{end}"] = {
+            'ascending': [item for item in out_mskd_file if 'SenA' in item],
+            'descending': [item for item in out_mskd_file if 'SenD' in item],
+            'horizontal': horz_name,
+            'vertical': vert_name,
+            'directory': project_base_dir,
+            }
+        out_mskd_file = []
 
     return plot_info
 

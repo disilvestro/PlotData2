@@ -4,8 +4,10 @@ import pygmt
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
+import matplotlib.ticker as ticker
 from plotdata.objects.section import Section
 from plotdata.objects.create_map import Mapper, Isolines, Relief
+from plotdata.helper_functions import draw_vectors
 
 def run_plot(plot_info, inps):
     vmin = inps.vlim[0] if inps.vlim else None
@@ -13,7 +15,193 @@ def run_plot(plot_info, inps):
     fig = plt.figure()
     plots = []
 
-    if inps.plot_type == 'velocity' or inps.plot_type == 'displacement':
+    if inps.plot_type == 'shaded_relief':
+        main_gs = gridspec.GridSpec(1, 1, figure=fig) #rows, columns
+        ax = fig.add_subplot(main_gs[0, 0])
+        rel_map = Mapper(ax=ax, region=inps.region)
+        Relief(map=rel_map, resolution = inps.resolution, interpolate=inps.interpolate, no_shade=inps.no_shade, zorder=None)
+
+    if inps.plot_type == 'horzvert':
+        main_gs = gridspec.GridSpec(2, len(plot_info.keys()), figure=fig)
+
+        for col,key in enumerate(plot_info.keys()):
+            # Extract files
+            horz_file, vert_file = (
+                plot_info[key]['horizontal'],
+                plot_info[key]['vertical']
+            )
+
+            # Create subplots and set properties
+            axes = [
+                fig.add_subplot(main_gs[0, col]),
+                fig.add_subplot(main_gs[1, col]),
+            ]
+
+            horz_map = processing_maps(ax=axes[0], file=horz_file, no_dem=inps.no_dem, resolution=inps.resolution, interpolate=inps.interpolate, no_shade=inps.no_shade, style=inps.style, vmin=vmin, vmax=vmax, isolines=inps.isolines, iso_color=inps.iso_color, linewidth=inps.linewidth, inline=inps.inline, movement=inps.movement)
+
+            vert_map = processing_maps(ax=axes[1], file=vert_file, no_dem=inps.no_dem, resolution=inps.resolution, interpolate=inps.interpolate, no_shade=inps.no_shade, style=inps.style, vmin=vmin, vmax=vmax, isolines=inps.isolines, iso_color=inps.iso_color, linewidth=inps.linewidth, inline=inps.inline, movement=inps.movement)
+
+
+    if inps.plot_type == 'vectors':
+        main_gs = gridspec.GridSpec(3, len(plot_info.keys()), figure=fig) #rows, columns
+
+        for col,key in enumerate(plot_info.keys()):
+            # Extract files
+            asc_file, desc_file, horz_file, vert_file = (
+                plot_info[key]['ascending'][0],
+                plot_info[key]['descending'][0],
+                plot_info[key]['horizontal'],
+                plot_info[key]['vertical']
+            )
+
+            # Create subplots and set properties
+            axes = [
+                fig.add_subplot(main_gs[0, col]),
+                fig.add_subplot(main_gs[1, col]),
+                fig.add_subplot(main_gs[2, col])
+            ]
+
+            for ax in axes:
+                ax.set_box_aspect(0.5)
+                ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=3))
+                ax.yaxis.set_major_locator(ticker.MaxNLocator(nbins=3))
+
+            asc_map = processing_maps(ax=axes[0],
+                            file=asc_file,
+                            no_dem=inps.no_dem,
+                            resolution=inps.resolution,
+                            interpolate=inps.interpolate,
+                            no_shade=inps.no_shade,
+                            style=inps.style,
+                            vmin=vmin,
+                            vmax=vmax,
+                            isolines=inps.isolines,
+                            iso_color=inps.iso_color,
+                            linewidth=inps.linewidth,
+                            inline=inps.inline,
+                            movement=inps.movement)
+
+            desc_map = processing_maps(ax=axes[1],
+                            file=desc_file,
+                            no_dem=inps.no_dem,
+                            resolution=inps.resolution,
+                            interpolate=inps.interpolate,
+                            no_shade=inps.no_shade,
+                            style=inps.style,
+                            vmin=vmin,
+                            vmax=vmax,
+                            isolines=inps.isolines,
+                            iso_color=inps.iso_color,
+                            linewidth=inps.linewidth,
+                            inline=inps.inline,
+                            movement=inps.movement)
+
+            # Process horizontal data
+            horizontal_data = Mapper(file=horz_file)
+            # Get horizontal data section
+            horizontal_section = Section(
+                horizontal_data.velocity,
+                horizontal_data.region,
+                inps.line[1],  # Vertical coordinate
+                inps.line[0]   # Horizontal coordinate
+            )
+
+            # Process vertical data
+            vertical_data = Mapper(file=vert_file)
+            # Get vertical data section
+            vertical_section = Section(
+                vertical_data.velocity,
+                vertical_data.region,
+                inps.line[1],
+                inps.line[0]
+            )
+
+            # Create elevation data
+            elevation = Relief(
+                map=horizontal_data,
+                resolution=inps.resolution
+            )
+
+            # Get elevation data section
+            elevation_section = Section(
+                elevation.elevation,
+                elevation.map.region,
+                inps.line[1],
+                inps.line[0]
+            )
+
+            # Calculate vector components
+            x, v, h = draw_vectors(
+                elevation_section.values,
+                vertical_section.values,
+                horizontal_section.values,
+                inps.line
+            )
+
+            # Get figure dimensions
+            fig_width, fig_height = fig.get_size_inches()
+
+            # Calculate vector scaling factors
+            v_adj = 2 * max(elevation_section.values) / max(x)
+            h_adj = 1 / v_adj
+
+            rescale_h = h_adj / fig_width
+            rescale_v = v_adj / fig_height
+
+            # Plot elevation profile
+            axes[2].plot(x, elevation_section.values)
+
+            # Configure plot limits
+            axes[2].set_ylim([0, 2 * max(elevation_section.values)])
+            axes[2].set_xlim([min(x), max(x)])
+
+            # Calculate vector scaling parameters
+            start_x, start_y = max(x) * 0.1, (2 * max(elevation_section.values) * 0.8)
+            magnitudes = np.sqrt(v**2 + h**2)
+            non_zero_magnitudes = magnitudes[magnitudes != 0] # No need??
+
+            # Resample vectors
+            for i in range(len(h)):
+                if i % inps.resample_vector != 0:
+                    h[i] = 0
+                    v[i] = 0
+
+            # Cancel vectors outside the plot
+            for i in range(len(h)):
+                if np.any(h[i] * rescale_h + x[i] < x[0]) or np.any(h[i] * rescale_h + x[i] > x[-1]):
+                    h[i] = 0
+                    v[i] = 0
+
+            # Filter out zero-length vectors
+            non_zero_indices = np.where((h != 0) | (v != 0))
+            filtered_x = x[non_zero_indices]
+            filtered_h = h[non_zero_indices]
+            filtered_v = v[non_zero_indices]
+            filtered_elevation = elevation_section.values[non_zero_indices]
+
+            # Plot velocity vectors
+            axes[2].quiver(
+                filtered_x,
+                filtered_elevation,
+                filtered_h * rescale_h,
+                filtered_v * rescale_v,
+                color='red',
+                scale_units='xy',
+                width=(1 / 10**(2.5))
+            )
+
+            # Control Vecor
+            if True:
+                print(max(v))
+                axes[2].quiver([start_x], [start_y], [np.mean(rescale_h)],[0], color='red', scale_units='xy', width=(1 / 10**(2.5)))
+                axes[2].quiver([start_x], [start_y], [0],[np.mean(rescale_v)], color='red', scale_units='xy', width=(1 / 10**(2.5)))
+
+    plt.show()
+    return
+
+################################################################
+
+    if inps.plot_type == 'velocity':
         plots.append('ascending')
         plots.append('descending')
 
@@ -30,25 +218,10 @@ def run_plot(plot_info, inps):
     if inps.plot_type == 'vertical':
         plots.append('vertical')
 
-    if inps.plot_type == 'vectors':
-        if 'ascending' in inps.add_plot:
-            for file in plot_info['ascending']:
-                inps.plot_type.append('ascending')
-
-        if 'descending' in inps.add_plot:
-            for file in plot_info['descending']:
-                inps.plot_type.append('descending')
-
-        if 'horizontal' in inps.add_plot:
-            for file in plot_info['horizontal']:
-                inps.plot_type.append('horizontal')
-
-        if 'vertical' in inps.add_plot:
-            for file in plot_info['vertical']:
-                inps.plot_type.append('vertical')
-
     if inps.plot_type == 'timeseries':
         pass
+
+
 
     rows = math.ceil(math.sqrt(len(plots)))
     columns = math.ceil(len(plots) / rows)
@@ -63,10 +236,50 @@ def run_plot(plot_info, inps):
         axes.append(ax)
 
     for i, plot in enumerate(plots):
+        if plot == "globe":
+            point_on_globe(inps.latitude, inps.longitude)
+
         if plot == 'ascending':
             file = plot_info['ascending'][0]
             plot_info['ascending'].remove(file)
-            asc_map = processing_maps(ax=axes[i], file=file, no_dem=inps.no_dem, resolution=inps.resolution, interpolate=inps.interpolate, no_shade=inps.no_shade, style=inps.style, vmin=vmin, vmax=vmax, isolines=inps.isolines, iso_color=inps.iso_color, linewidth=inps.linewidth, inline=inps.inline, movement=inps.movement)
+            asc_map = processing_maps(ax=axes[i],
+                                      file=file,
+                                      no_dem=inps.no_dem,
+                                      resolution=inps.resolution,
+                                      interpolate=inps.interpolate,
+                                      no_shade=inps.no_shade,
+                                      style=inps.style,
+                                      vmin=vmin,
+                                      vmax=vmax,
+                                      isolines=inps.isolines,
+                                      iso_color=inps.iso_color,
+                                      linewidth=inps.linewidth,
+                                      inline=inps.inline,
+                                      movement=inps.movement)
+            desc_map = processing_maps(ax=axes[i],
+                                      file=file,
+                                      no_dem=inps.no_dem,
+                                      resolution=inps.resolution,
+                                      interpolate=inps.interpolate,
+                                      no_shade=inps.no_shade,
+                                      style=inps.style,
+                                      vmin=vmin,
+                                      vmax=vmax,
+                                      isolines=inps.isolines,
+                                      iso_color=inps.iso_color,
+                                      linewidth=inps.linewidth,
+                                      inline=inps.inline,
+                                      movement=inps.movement)
+
+            horizontal_file = plot_info['horizontal'].pop(0)
+            horizontal_data = Mapper(file=horizontal_file)
+            # Get horizontal data section
+            horizontal_section = Section(
+                horizontal_data.velocity,
+                horizontal_data.region,
+                line[1],  # Vertical coordinate
+                line[0]   # Horizontal coordinate
+            )
 
         if plot == 'descending':
             file = plot_info['descending'][0]
@@ -88,14 +301,94 @@ def run_plot(plot_info, inps):
             Relief(map=rel_map, resolution = inps.resolution, interpolate=inps.interpolate, no_shade=inps.no_shade, zorder=None)
 
         if plot == 'vectors':
-            plot_info['horizontal'][0]
-            horz_section = Section(file)
+            line = [(-77.968,-77.9309), (0.793, 0.793)]
+            # Process horizontal data
+            horizontal_file = plot_info['horizontal'].pop(0)
+            horizontal_data = Mapper(file=horizontal_file)
+            # Get horizontal data section
+            horizontal_section = Section(
+                horizontal_data.velocity,
+                horizontal_data.region,
+                line[1],  # Vertical coordinate
+                line[0]   # Horizontal coordinate
+            )
 
-            plot_info['vertical'][0]
-            vert_section = Section(file)
+            # Process vertical data
+            vertical_file = plot_info['vertical'].pop(0)
+            vertical_data = Mapper(file=vertical_file)
+            # Get vertical data section
+            vertical_section = Section(
+                vertical_data.velocity,
+                vertical_data.region,
+                line[1],
+                line[0]
+            )
 
-    print('Plot order ', inps.add_plot)
-    plt.tight_layout()
+            # Create elevation data
+            elevation = Relief(
+                map=horizontal_data,
+                resolution=inps.resolution
+            )
+            # Get elevation data section
+            elevation_section = Section(
+                elevation.elevation,
+                elevation.map.region,
+                line[1],
+                line[0]
+            )
+
+            # Calculate vector components
+            x, v, h = draw_vectors(
+                elevation_section.values,
+                vertical_section.values,
+                horizontal_section.values,
+                line
+            )
+
+            # Plot elevation profile
+            axes[i].plot(x, elevation_section.values)
+
+            # Configure plot limits
+            axes[i].set_ylim([0, 2 * max(elevation_section.values)])
+            axes[i].set_xlim([min(x), max(x)])
+
+            # Calculate vector scaling parameters
+            start_x, start_y = max(x) * 0.1, (2 * max(elevation_section.values) * 0.8)
+            magnitudes = np.sqrt(v**2 + h**2)
+            non_zero_magnitudes = magnitudes[magnitudes != 0]
+            ll = np.mean(non_zero_magnitudes) * x
+
+            # Calculate vector scaling factors
+            v_adj = 2 * max(elevation_section.values) / max(x)
+            h_adj = 1 / v_adj
+
+            # Get figure dimensions
+            fig_width, fig_height = fig.get_size_inches()
+
+            # Plot velocity vectors
+            axes[i].quiver(
+                x,
+                elevation_section.values,
+                h * h_adj / fig_width,
+                v * v_adj / fig_height
+            )
+
+
+            # Control Vecor
+            if True:
+                print(max(v))
+                axes[i].quiver([start_x], [start_y], [500 *h_adj/fig_width],[0], color='red', angles='xy', scale_units='xy', width=(1 / 10**(2.5)))
+                axes[i].quiver([start_x], [start_y], [0],[500 *v_adj/fig_height], color='red', scale_units='xy', width=(1 / 10**(2.5)))
+
+
+            #vectors
+
+        axes[i].set_box_aspect(0.7)
+        axes[i].xaxis.set_major_locator(ticker.MaxNLocator(nbins=3))
+        axes[i].yaxis.set_major_locator(ticker.MaxNLocator(nbins=3))
+
+    print('Plot order ', plots)
+    # plt.tight_layout()
     plt.show()
 
 
@@ -111,7 +404,6 @@ def processing_maps(ax, file, no_dem, resolution, interpolate, no_shade, style, 
         Isolines(map=map, resolution = resolution, color = iso_color, linewidth = linewidth, levels = isolines, inline = inline, zorder = None) # TODO add zorder
 
     return map
-
 
 
 def point_on_globe(latitude, longitude, size='1'):

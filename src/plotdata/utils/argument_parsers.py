@@ -12,17 +12,19 @@ def add_date_arguments(parser):
     """
     date = parser.add_argument_group('Date range of the search')
     date.add_argument('--start-date',
-                        nargs='?',
+                        nargs='*',
                         metavar='YYYYMMDD',
                         type=str,
-                        help='Start date of the search (default: %(default)s).')
+                        default=[],
+                        help='Start date of the search')
     date.add_argument('--end-date',
-                        nargs='?',
+                        nargs='*',
                         metavar='YYYYMMDD',
                         type=str,
-                        help='End date of the search (default: %(default)s).')
+                        default=[],
+                        help='End date of the search')
     date.add_argument('--period',
-                        nargs='?',
+                        nargs='*',
                         metavar='YYYYMMDD:YYYYMMDD, YYYYMMDD,YYYYMMDD',
                         type=str,
                         help='Period of the search')

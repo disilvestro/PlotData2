@@ -1,4 +1,4 @@
-from plotdata.objects.create_map import Mapper
+from plotdata.objects.create_map import Mapper, Relief
 import numpy as np
 import pandas as pd
 from plotdata.helper_functions import calculate_distance
@@ -6,8 +6,11 @@ from plotdata.helper_functions import calculate_distance
 
 
 class Section():
-    def __init__(self, data, region, latitude, longitude, interpolate=None) -> None:
-        lat_indices, lon_indices = self.draw_line(data, region, latitude, longitude)
+    def __init__(self, data, region, latitude, longitude) -> None:
+        self.data = data
+        self.region = region
+
+        lat_indices, lon_indices = self.draw_line(self.data, self.region, latitude, longitude)
 
         # TODO test if data needs to be flipped
         if False:

@@ -17,9 +17,9 @@ from plotdata.helper_functions import parse_polygon, get_bounding_box
 class Mapper():
     def __init__(self, region=None, polygon=None, location_types: dict = {}, ax=None, file=None):
         if not ax:
-            self.fig = plt.figure(figsize=(8, 8))
-            self.ax = self.fig.add_subplot(111)
-
+            # self.fig = plt.figure(figsize=(8, 8))
+            # self.ax = self.fig.add_subplot(111)
+            pass
         else:
             self.ax = ax
             self.fig = ax.get_figure()
@@ -111,7 +111,7 @@ class Mapper():
 
         if style == 'ifgram':
             label = 'Displacement (m)'
-            data_phase = (2 * np.pi / float(self.metadata['WAVELENGTH'])) * self.displacement
+            data_phase = (2 * np.pi / float(self.metadata['WAVELENGTH'])) *  self.displacement #(self.displacement + float(self.metadata['HEIGHT']))
             data_wrapped = np.mod(data_phase, 2 * np.pi)
             self.imdata = self.ax.imshow(data_wrapped, cmap=cmap, extent=self.region, origin='upper', interpolation='none',zorder=self.zorder, vmin=0, vmax=2 * np.pi)
 
@@ -184,7 +184,7 @@ class Relief:
 
         # Plot colormap
         # Load the relief data
-        print("Adding colormap\n")
+        print("Adding elevation\n")
         self.elevation = pygmt.datasets.load_earth_relief(resolution=self.resolution, region=self.map.region)
 
         if interpolate:
@@ -193,11 +193,12 @@ class Relief:
         # Set all negative values to 0
         self.elevation = np.where(self.elevation >= 0, self.elevation, 0)
 
-        if not no_shade:
-            self.im = self.shade_elevation(zorder=self.zorder)
-        else:
-            print('here')
-            self.im = self.map.ax.imshow(self.elevation.values, cmap=self.cmap, extent=self.map.region, origin='lower', zorder=self.zorder)
+        if hasattr(map, 'ax'):
+            if not no_shade:
+                self.im = self.shade_elevation(zorder=self.zorder)
+            else:
+                print('here')
+                self.im = self.map.ax.imshow(self.elevation.values, cmap=self.cmap, extent=self.map.region, origin='lower', zorder=self.zorder)
 
 
     def interpolate_relief(self, resolution):

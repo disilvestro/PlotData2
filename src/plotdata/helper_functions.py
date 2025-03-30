@@ -5,6 +5,7 @@ import subprocess
 import glob
 from mintpy.utils import readfile
 from mintpy.objects import HDFEOS
+from scipy.interpolate import interp1d
 import numpy as np
 from pathlib import Path
 
@@ -353,3 +354,48 @@ def get_bounding_box(metadata):
         lon_out.append(lon_i)
 
     return [min(lat_out), max(lat_out)], [min(lon_out), max(lon_out)]
+
+
+def draw_vectors(elevation, vertical, horizontal, line):
+    v = interpolate(elevation, vertical)
+    h = interpolate(elevation, horizontal)
+
+    length = np.sqrt(v**2 + h**2)
+
+    #Normalization
+    nv = [1 if val > 0 else -1 if val < 0 else 0 for val in v]
+    nh = [1 if val > 0 else -1 if val < 0 else 0 for val in h]
+
+    v1 = abs(v)
+    h1 = abs(h)
+
+    m = max(v1) if max(v1) > max(h1) else max(h1)
+
+    tv = (v1 - 0) / (m - 0)
+    th = (h1 - 0) / (m - 0)
+
+    # Matrix times normalized data
+    v = nv * tv
+    h = nh * th
+
+    mean_vec = np.mean(length)
+    extent_el = abs(max(elevation) - min(elevation))
+
+    exp = (math.floor(math.log10(abs(extent_el / mean_vec))))
+    x_coords = np.linspace(0, calculate_distance(line[0][0], line[1][0], line[0][1], line[1][1])*1000, len(elevation))
+
+    return x_coords, v, h
+
+
+def interpolate(x, y):
+    len_x = len(x)
+    len_y = len(y)
+
+    # Interpolate to match lengths
+    if len_x > len_y:
+        x_old = np.linspace(0, 1, len_y)
+        x_new = np.linspace(0, 1, len_x)
+        y_values_interpolated = interp1d(x_old, y, kind='linear')(x_new)
+        y = y_values_interpolated
+
+    return y
